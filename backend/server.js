@@ -16,24 +16,32 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Health Check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Backend is running' });
+  res.json({ status: 'Backend is running', timestamp: new Date() });
 });
 
-// Routes will be imported here
-// app.use('/api/auth', require('./src/routes/auth'));
-// app.use('/api/search', require('./src/routes/search'));
-// app.use('/api/cart', require('./src/routes/cart'));
-// app.use('/api/favorites', require('./src/routes/favorites'));
+// Routes
+app.use('/api/auth', require('./src/routes/auth'));
+app.use('/api/search', require('./src/routes/search'));
+app.use('/api/cart', require('./src/routes/cart'));
+app.use('/api/checkout', require('./src/routes/checkout'));
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
 
 // Error Handler
 app.use((err, req, res, next) => {
-  console.error(err);
+  console.error('Error:', err);
   res.status(err.status || 500).json({ 
-    error: err.message || 'Internal Server Error' 
+    error: err.message || 'Internal Server Error',
+    status: err.status || 500
   });
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  console.log(`📊 MongoDB: ${process.env.MONGODB_URI}`);
+  console.log(`🤖 ML Service: ${process.env.ML_SERVICE_URL}`);
 });
