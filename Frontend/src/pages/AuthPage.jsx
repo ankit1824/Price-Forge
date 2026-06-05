@@ -26,38 +26,28 @@ export default function AuthPage({ setIsLoggedIn, setUser }) {
 
     try {
       if (isLogin) {
-        const response = await axios.post('/api/auth/login', {
+        // Mock login
+        localStorage.setItem('authToken', 'mock-token-' + Date.now())
+        localStorage.setItem('user', JSON.stringify({ 
           email: formData.email,
-          password: formData.password
-        })
-
-        localStorage.setItem('authToken', response.data.token)
-        localStorage.setItem('user', JSON.stringify(response.data.user))
+          name: formData.email.split('@')[0]
+        }))
         setIsLoggedIn(true)
-        setUser(response.data.user)
+        setUser({ email: formData.email, name: formData.email.split('@')[0] })
         navigate('/')
       } else {
-        // Register
-        if (formData.password !== formData.confirmPassword) {
-          setError('Passwords do not match')
-          setLoading(false)
-          return
-        }
-
-        const response = await axios.post('/api/auth/register', {
+        // Mock register
+        localStorage.setItem('authToken', 'mock-token-' + Date.now())
+        localStorage.setItem('user', JSON.stringify({ 
           email: formData.email,
-          password: formData.password,
           name: formData.name
-        })
-
-        localStorage.setItem('authToken', response.data.token)
-        localStorage.setItem('user', JSON.stringify(response.data.user))
+        }))
         setIsLoggedIn(true)
-        setUser(response.data.user)
+        setUser({ email: formData.email, name: formData.name })
         navigate('/')
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred')
+      setError('Authentication failed')
     } finally {
       setLoading(false)
     }
@@ -108,18 +98,6 @@ export default function AuthPage({ setIsLoggedIn, setUser }) {
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
           />
-
-          {!isLogin && (
-            <input
-              type="password"
-              name="confirmPassword"
-              placeholder="Confirm Password"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-            />
-          )}
 
           <button
             type="submit"

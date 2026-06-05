@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import PriceComparison from '../components/PriceComparison'
-import CartTotal from '../components/CartTotal'
 
 export default function ResultsPage() {
   const location = useLocation()
@@ -32,35 +30,13 @@ export default function ResultsPage() {
       </button>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main Results */}
         <div className="lg:col-span-2">
           <h2 className="text-3xl font-bold mb-6">Price Comparison Results</h2>
-          {results.items && results.items.length > 0 ? (
-            <div className="space-y-6">
-              {results.items.map((item, idx) => (
-                <PriceComparison key={idx} item={item} />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-yellow-50 p-6 rounded-lg border border-yellow-200">
-              <p className="text-yellow-800">No results found. Please try different items.</p>
-            </div>
-          )}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <p className="text-gray-600">Results will appear here</p>
+          </div>
         </div>
-
-        {/* Cart Total Summary */}
-        <div>
-          <CartTotal items={cart} results={results} />
-        </div>
-      </div>
-
-      {/* Disclaimer */}
-      <div className="mt-12 bg-blue-50 border border-blue-200 p-4 rounded-lg">
-        <p className="text-blue-900 text-sm">
-          <strong>⚠️ Disclaimer:</strong> Prices are fetched in real-time and may vary on original apps. 
-          Always verify prices on the respective platforms before making a purchase. We maintain ±2 rupees accuracy margin.
-        </p>
       </div>
     </div>
   )
-} 
+}

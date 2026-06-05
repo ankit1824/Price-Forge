@@ -13,11 +13,9 @@ function App() {
   const [user, setUser] = useState(null)
 
   useEffect(() => {
-    // Check if user is logged in on app load
     const token = localStorage.getItem('authToken')
     if (token) {
       setIsLoggedIn(true)
-      // Fetch user data
       const userData = JSON.parse(localStorage.getItem('user') || '{}')
       setUser(userData)
     }

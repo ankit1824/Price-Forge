@@ -20,12 +20,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth transitions */
 button, input, a {
   @apply transition-all duration-200;
 }
 
-/* Remove default input styling */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -33,7 +31,6 @@ input[type="number"] {
   @apply focus:ring-0;
 }
 
-/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
