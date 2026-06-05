@@ -3,42 +3,61 @@ version: '3.8'
 services:
   mongodb:
     image: mongo:latest
+    container_name: priceforge-mongodb
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: priceforge
     volumes:
-      - mongo_data:/data/db
+      - mongodb_data:/data/db
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: Dockerfile-Backend
+    container_name: priceforge-backend
     ports:
       - "5000:5000"
-    environment:
-      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/priceforge?authSource=admin
-      - JWT_SECRET=your_jwt_secret_key_here_change_in_production
-      - NODE_ENV=development
-      - ML_SERVICE_URL=http://ml-service:8000
     depends_on:
       - mongodb
+    environment:
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/priceforge?authSource=admin
+      JWT_SECRET: your-secret-key-change-this
+      ML_SERVICE_URL: http://ml-service:8000
+      NODE_ENV: development
     volumes:
       - ./backend:/app
-    command: npm run dev
 
   ml-service:
-    build: ./ml-service
+    build:
+      context: .
+      dockerfile: Dockerfile-ML
+    container_name: priceforge-ml
     ports:
       - "8000:8000"
-    environment:
-      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/priceforge?authSource=admin
-      - BACKEND_URL=http://backend:5000
-      - PYTHONUNBUFFERED=1
     depends_on:
       - mongodb
+    environment:
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/priceforge?authSource=admin
+      MODEL_NAME: all-MiniLM-L6-v2
     volumes:
       - ./ml-service:/app
 
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile-Frontend
+    container_name: priceforge-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+      - ml-service
+
 volumes:
-  mongo_data:
+  mongodb_data:
+
+networks:
+  default:
+    name: priceforge-network
