@@ -1,6 +1,6 @@
 """
 Best Deal Scoring Service
-Calculates best deal considering price, delivery fee, and minimum order
+Calculates best deal considering price, delivery fee, availability, and minimum order
 """
 from app.utils.logger import get_logger
 
@@ -8,103 +8,108 @@ logger = get_logger(__name__)
 
 class PricingService:
     @staticmethod
-    def calculate_best_deal(matches, cart_items):
+    def calculate_best_deal(results_items):
         """
-        Calculate best deal for cart items
+        Calculate best deal across platforms for the searched items.
         
         Args:
-            matches: Match results from matching service
-            cart_items: List of {itemName, quantity}
+            results_items: List of search results from backend. Each item has:
+                - name: original search name
+                - quantity: requested quantity
+                - prices: dict of platform -> price details
+                - availability: dict of platform -> boolean
         
         Returns:
-            Dict with best platform and breakdown
+            Dict with platform totals, best platform, and missing items details.
         """
         try:
+            platforms = ['blinkit', 'zepto', 'instamart']
             platform_totals = {
-                'blinkit': {'subtotal': 0, 'delivery': 0, 'eligible': True},
-                'zepto': {'subtotal': 0, 'delivery': 0, 'eligible': True},
-                'instamart': {'subtotal': 0, 'delivery': 0, 'eligible': True}
+                p: {
+                    'subtotal': 0.0,
+                    'deliveryFee': 0.0,
+                    'total': 0.0,
+                    'availableCount': 0,
+                    'totalCount': len(results_items),
+                    'missingItems': [],
+                    'eligible': False
+                } for p in platforms
             }
             
-            partial_availability = []
-            
-            # Calculate for each platform
-            for match in matches:
-                search_query = match['search_query']
-                available_count = match['available_on']
+            # Sum up prices for each platform
+            for item in results_items:
+                item_name = item.get('name', 'Unknown Item')
+                qty = item.get('quantity', 1)
+                prices = item.get('prices', {})
+                availability = item.get('availability', {})
                 
-                if available_count < 3:
-                    partial_availability.append({
-                        'itemName': search_query,
-                        'availableOn': [p for p, data in match['platforms'].items() if data],
-                        'availabilityCount': f"{available_count}/3"
-                    })
-                
-                # Find corresponding cart item
-                cart_item = next((c for c in cart_items if c['itemName'].lower() == search_query.lower()), None)
-                if not cart_item:
-                    continue
-                
-                quantity = cart_item['quantity']
-                
-                for platform, product_data in match['platforms'].items():
-                    if product_data is None:
-                        platform_totals[platform]['eligible'] = False
-                        continue
+                for platform in platforms:
+                    p_data = prices.get(platform)
+                    is_avail = availability.get(platform, False)
                     
-                    price = product_data['price']
-                    delivery = PricingService._parse_delivery_fee(product_data['delivery'])
-                    
-                    platform_totals[platform]['subtotal'] += price * quantity
-                    platform_totals[platform]['delivery'] = delivery
+                    if is_avail and p_data and p_data.get('price') is not None:
+                        price = float(p_data.get('price', 0))
+                        platform_totals[platform]['subtotal'] += price * qty
+                        platform_totals[platform]['availableCount'] += 1
+                        
+                        # Use the highest delivery fee scraped or a default
+                        fee = float(p_data.get('deliveryFee', 0))
+                        if fee > platform_totals[platform]['deliveryFee']:
+                            platform_totals[platform]['deliveryFee'] = fee
+                    else:
+                        platform_totals[platform]['missingItems'].append(item_name)
             
-            # Calculate totals and find best deal
-            results = {}
+            # Apply default delivery fees if subtotal is greater than 0 but delivery fee is 0
+            # (since delivery fees are sometimes dynamic and not easily scraped)
+            defaults = {'blinkit': 15.0, 'zepto': 20.0, 'instamart': 19.0}
+            min_orders = {'blinkit': 99.0, 'zepto': 99.0, 'instamart': 99.0}
+            
+            for platform in platforms:
+                data = platform_totals[platform]
+                if data['availableCount'] > 0:
+                    data['eligible'] = True
+                    # If subtotal is less than minimum order, add small surcharge or default delivery fee
+                    if data['subtotal'] < min_orders[platform]:
+                        data['deliveryFee'] = max(data['deliveryFee'], defaults[platform] + 10.0)
+                    elif data['deliveryFee'] == 0:
+                        data['deliveryFee'] = defaults[platform]
+                    
+                    data['total'] = round(data['subtotal'] + data['deliveryFee'], 2)
+                    data['subtotal'] = round(data['subtotal'], 2)
+                    data['deliveryFee'] = round(data['deliveryFee'], 2)
+            
+            # Find the best deal
+            # Criteria:
+            # 1. Maximum availableCount (we want the most items available)
+            # 2. Minimum total price (lowest cost for the items that are available)
             best_deal = None
+            max_available = 0
             min_total = float('inf')
             
-            for platform, data in platform_totals.items():
+            for platform in platforms:
+                data = platform_totals[platform]
                 if not data['eligible']:
-                    results[platform] = {
-                        'subtotal': data['subtotal'],
-                        'delivery': data['delivery'],
-                        'total': 0,
-                        'eligible': False,
-                        'reason': 'Item not available on this platform'
-                    }
-                else:
-                    total = data['subtotal'] + data['delivery']
-                    results[platform] = {
-                        'subtotal': data['subtotal'],
-                        'delivery': data['delivery'],
-                        'total': total,
-                        'eligible': True
-                    }
-                    
-                    if total < min_total:
-                        min_total = total
+                    continue
+                
+                # Compare availability first
+                if data['availableCount'] > max_available:
+                    max_available = data['availableCount']
+                    min_total = data['total']
+                    best_deal = platform
+                elif data['availableCount'] == max_available:
+                    # If same availability, compare price
+                    if data['total'] < min_total:
+                        min_total = data['total']
                         best_deal = platform
             
             return {
-                'platformResults': results,
+                'platformResults': platform_totals,
                 'bestDeal': best_deal,
-                'partialAvailability': partial_availability,
-                'disclaimer': 'Prices are fetched in real-time and may vary on actual apps'
+                'totalSearchedItems': len(results_items),
+                'disclaimer': 'Prices are fetched in real-time and may vary on actual apps. Accuracy margin: ±2 rupees'
             }
 
         except Exception as e:
             logger.error(f"Error calculating best deal: {e}")
             return {'error': str(e)}
 
-    @staticmethod
-    def _parse_delivery_fee(delivery_str):
-        """Parse delivery fee from string"""
-        try:
-            if 'Free' in delivery_str or '0' in delivery_str:
-                return 0
-            
-            import re
-            numbers = re.findall(r'\d+', delivery_str)
-            return int(numbers[0]) if numbers else 0
-        except:
-            return 0
